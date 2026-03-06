@@ -46,18 +46,23 @@ async def process_audio(file: UploadFile = File(...)):
         transcript_text = transcription.text
 
         prompt = f"""
-        You extract FINAL CONFIRMED grocery orders from Hindi phone conversations.
+        You extract grocery orders from Hindi phone calls.
 
-        STRICT RULES:
+        IMPORTANT:
 
-        1. Only extract items that are FINALIZED at the end of the conversation.
-        2. If item was discussed earlier but later changed/rejected → IGNORE.
-        3. If quantity unclear → IGNORE item.
-        4. Ignore filler talk.
-        5. Ignore comparisons.
-        6. Ignore cancelled items.
+        Extract ALL mentioned items.
+        Do NOT remove uncertain items.
 
-        Think step-by-step internally but output ONLY final JSON.
+        For each item assign:
+
+        • confidence = high / medium / low
+        • reason = short explanation
+
+        Rules:
+
+        HIGH → clearly ordered, not corrected  
+        MEDIUM → likely ordered but unclear  
+        LOW → discussed / rejected / unclear  
 
         Return STRICT JSON:
 
@@ -65,8 +70,10 @@ async def process_audio(file: UploadFile = File(...)):
         "items":[
         {{
             "name":"",
-            "quantity":number,
-            "unit":"kg/bori/packet/etc"
+            "quantity":number_or_null,
+            "unit":"",
+            "confidence":"",
+            "reason":""
         }}
         ]
         }}
