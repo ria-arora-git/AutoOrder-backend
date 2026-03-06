@@ -46,35 +46,35 @@ async def process_audio(file: UploadFile = File(...)):
         transcript_text = transcription.text
 
         prompt = f"""
-You are an expert order extraction system.
+        You extract FINAL CONFIRMED grocery orders from Hindi phone conversations.
 
-Understand the Hindi/Punjabi phone conversation carefully and extract ONLY FINAL CONFIRMED ORDERS.
+        STRICT RULES:
 
-Ignore:
-• filler talk
-• greetings
-• rejected items
-• comparisons
-• corrections spoken earlier
+        1. Only extract items that are FINALIZED at the end of the conversation.
+        2. If item was discussed earlier but later changed/rejected → IGNORE.
+        3. If quantity unclear → IGNORE item.
+        4. Ignore filler talk.
+        5. Ignore comparisons.
+        6. Ignore cancelled items.
 
-If decision changes → keep ONLY final.
+        Think step-by-step internally but output ONLY final JSON.
 
-Return STRICT JSON:
+        Return STRICT JSON:
 
-{{
- "items":[
-   {{
-     "name":"",
-     "quantity":number_or_null,
-     "unit":"kg/packet/dabba/bori/etc or null"
-   }}
- ]
-}}
+        {{
+        "items":[
+        {{
+            "name":"",
+            "quantity":number,
+            "unit":"kg/bori/packet/etc"
+        }}
+        ]
+        }}
 
-Conversation:
+        Conversation:
 
-{transcript_text}
-"""
+        {transcript_text}
+        """
 
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -94,10 +94,10 @@ Conversation:
         structured_data = json.loads(response_text)
 
         return {
+            "model_used": "llama-3.1-8b-instant",
             "structured": structured_data,
             "transcript": transcript_text
         }
-
     except Exception as e:
         return {
             "error": str(e),
