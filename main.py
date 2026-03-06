@@ -79,19 +79,17 @@ async def process_audio(file: UploadFile = File(...)):
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "You extract structured order data."},
+                {"role": "system", "content": "Extract final grocery orders."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0
+            temperature=0,
+            response_format={"type": "json_object"} 
         )
 
 
         response_text = completion.choices[0].message.content.strip()
 
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-
-        structured_data = json.loads(response_text)
+        structured_data = json.loads(completion.choices[0].message.content)
 
         return {
             "model_used": "llama-3.1-8b-instant",
