@@ -34,8 +34,9 @@ async def process_audio(file: UploadFile = File(...)):
     with open(temp_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    transcript_text = ""
+
     try:
-        # STEP 1: Transcription
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 file=audio_file,
@@ -44,25 +45,39 @@ async def process_audio(file: UploadFile = File(...)):
 
         transcript_text = transcription.text
 
-        # STEP 2: Structured extraction
         prompt = f"""
-        Extract structured order data from this transcript.
-        Return ONLY valid JSON.
+You are an expert order extraction system.
 
-        Transcript:
-        {transcript_text}
+Understand the Hindi/Punjabi phone conversation carefully and extract ONLY FINAL CONFIRMED ORDERS.
 
-        JSON format:
-        {{
-          "store": "",
-          "items": [
-            {{"name": "", "quantity": 0, "unit": ""}}
-          ]
-        }}
-        """
+Ignore:
+• filler talk
+• greetings
+• rejected items
+• comparisons
+• corrections spoken earlier
+
+If decision changes → keep ONLY final.
+
+Return STRICT JSON:
+
+{{
+ "items":[
+   {{
+     "name":"",
+     "quantity":number_or_null,
+     "unit":"kg/packet/dabba/bori/etc or null"
+   }}
+ ]
+}}
+
+Conversation:
+
+{transcript_text}
+"""
 
         completion = client.chat.completions.create(
-            model="llama3-70b-8192",
+            model="llama3-8b-8192",
             messages=[
                 {"role": "system", "content": "You extract structured order data."},
                 {"role": "user", "content": prompt}
@@ -70,14 +85,23 @@ async def process_audio(file: UploadFile = File(...)):
             temperature=0
         )
 
-        structured_data = json.loads(completion.choices[0].message.content)
 
-        return structured_data
+        response_text = completion.choices[0].message.content.strip()
+
+        if response_text.startswith("```"):
+            response_text = response_text.split("```")[1]
+
+        structured_data = json.loads(response_text)
+
+        return {
+            "structured": structured_data,
+            "transcript": transcript_text
+        }
 
     except Exception as e:
         return {
             "error": str(e),
-            "raw_transcript": transcript_text if "transcript_text" in locals() else ""
+            "raw_transcript": transcript_text
         }
 
     finally:
