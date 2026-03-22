@@ -48,40 +48,43 @@ async def process_audio(file: UploadFile = File(...)):
         transcript_text = transcription.text
 
         prompt = f"""
-You extract grocery orders from Hindi phone calls.
+You extract structured grocery order data from Hindi phone calls.
 
-CRITICAL RULES:
+The conversation may contain:
+• store name
+• order items
+• filler speech
 
-• DO NOT guess item names
-• ONLY extract items that clearly exist in transcript
-• If word is unclear → keep original word
-• DO NOT convert unclear words into known grocery items
+TASKS:
 
-• Always include:
-  - raw_text (original spoken word)
-  - normalized_name (if confident, else null)
+1. Identify STORE NAME if mentioned
+2. Extract ALL items
 
-• NEVER invent items
+RULES:
 
-CONFIDENCE RULES:
+• DO NOT guess
+• If store name is unclear → return null
+• Store name should be a single string
 
-HIGH → clearly ordered  
-MEDIUM → likely but slightly unclear  
-LOW → unclear / distorted audio  
+• For items:
+  - include raw_text
+  - include normalized_name (only if confident)
+  - include quantity and unit
 
 Return STRICT JSON:
 
 {{
- "items":[
-   {{
-     "raw_text":"",
-     "normalized_name": "",
-     "quantity": number_or_null,
-     "unit":"",
-     "confidence":"",
-     "reason":""
-   }}
- ]
+  "store_name": "",
+  "items":[
+    {{
+      "raw_text":"",
+      "normalized_name":"",
+      "quantity": null,
+      "unit":"",
+      "confidence":"",
+      "reason":""
+    }}
+  ]
 }}
 
 Conversation:
