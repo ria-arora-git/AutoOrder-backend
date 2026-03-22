@@ -40,61 +40,63 @@ async def process_audio(file: UploadFile = File(...)):
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 file=audio_file,
-                model="whisper-large-v3-turbo"
+                model="whisper-large-v3-turbo",
+                prompt="This is a Hindi grocery ordering phone call. Common words: chini, chawal, rajma, dal, tel, atta, store names like Arun Store.",
+                language="hi"
             )
 
         transcript_text = transcription.text
 
         prompt = f"""
-        You extract grocery orders from Hindi phone calls.
+You extract grocery orders from Hindi phone calls.
 
-        IMPORTANT:
+CRITICAL RULES:
 
-        Extract ALL mentioned items.
-        Do NOT remove uncertain items.
+• DO NOT guess item names
+• ONLY extract items that clearly exist in transcript
+• If word is unclear → keep original word
+• DO NOT convert unclear words into known grocery items
 
-        For each item assign:
+• Always include:
+  - raw_text (original spoken word)
+  - normalized_name (if confident, else null)
 
-        • confidence = high / medium / low
-        • reason = short explanation
+• NEVER invent items
 
-        Rules:
+CONFIDENCE RULES:
 
-        HIGH → clearly ordered, not corrected  
-        MEDIUM → likely ordered but unclear  
-        LOW → discussed / rejected / unclear  
+HIGH → clearly ordered  
+MEDIUM → likely but slightly unclear  
+LOW → unclear / distorted audio  
 
-        Return STRICT JSON:
+Return STRICT JSON:
 
-        {{
-        "items":[
-        {{
-            "name":"",
-            "quantity":number_or_null,
-            "unit":"",
-            "confidence":"",
-            "reason":""
-        }}
-        ]
-        }}
+{{
+ "items":[
+   {{
+     "raw_text":"",
+     "normalized_name": "",
+     "quantity": number_or_null,
+     "unit":"",
+     "confidence":"",
+     "reason":""
+   }}
+ ]
+}}
 
-        Conversation:
-
-        {transcript_text}
-        """
+Conversation:
+{transcript_text}
+"""
 
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             messages=[
-                {"role": "system", "content": "Extract final grocery orders."},
+                {"role": "system", "content": "You extract structured grocery order data."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0,
-            response_format={"type": "json_object"} 
+            response_format={"type": "json_object"},
         )
-
-
-        response_text = completion.choices[0].message.content.strip()
 
         structured_data = json.loads(completion.choices[0].message.content)
 
@@ -103,6 +105,7 @@ async def process_audio(file: UploadFile = File(...)):
             "structured": structured_data,
             "transcript": transcript_text
         }
+
     except Exception as e:
         return {
             "error": str(e),
