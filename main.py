@@ -40,7 +40,7 @@ async def process_audio(file: UploadFile = File(...)):
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
                 file=audio_file,
-                model="whisper-large-v3-turbo",
+                model="whisper-large-v3",
                 language="hi",
                 prompt="""
 Hindi grocery phone order.
@@ -63,6 +63,12 @@ Good:
             )
 
         transcript_text = transcription.text.strip()
+
+        if len(transcript_text.split()) < 2:
+            return {
+                "error": "Audio too short / unclear",
+                "transcript": transcript_text
+            }
 
         print("TRANSCRIPT:", transcript_text)
 
