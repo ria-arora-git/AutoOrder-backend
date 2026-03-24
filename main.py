@@ -39,65 +39,66 @@ async def process_audio(file: UploadFile = File(...)):
     try:
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
-            file=audio_file,
-            model="whisper-large-v3-turbo",
-            prompt="""
-        This is a Hindi grocery ordering phone call.
+    file=audio_file,
+    model="whisper-large-v3-turbo",
+    prompt="""
+Hindi grocery order conversation.
 
-        The speaker speaks Hindi or Hinglish.
+STRICT RULES:
+- Language is Hindi only
+- Do NOT output English sentences
+- Do NOT translate into English
+- Preserve Hindi words phonetically
 
-        Common words:
-        bhaiya, kilo, dabba, tel, chini, chawal, rajma, dal, atta
+Examples:
+bhaiya, kilo, dabba, tel, chini, chawal, rajma, dal
 
-        Do NOT interpret as English.
-        Prefer Hindi phonetics.
-        """,
-            language="hi"
-        )
+Bad output example:
+"metal tape bars" ❌
+
+Good output:
+"4 dabba tel" ✅
+""",
+    language="hi"
+)
 
         transcript_text = transcription.text
 
         prompt = f"""
-You extract structured grocery order data from Hindi phone calls.
+You are NOT allowed to guess.
 
-The conversation may contain:
-• store name
-• order items
-• filler speech
+You ONLY extract items that are EXPLICITLY spoken.
 
-TASKS:
+STRICT RULES:
 
-1. Identify STORE NAME if mentioned
-2. Extract ALL items
+- Do NOT infer missing items
+- Do NOT replace unknown words with known grocery items
+- Do NOT translate into English if unclear
+- If word unclear → keep raw_text and mark LOW confidence
+- If something sounds like noise → keep as raw_text, do NOT interpret
 
-RULES:
+IMPORTANT:
+If transcript is unclear or noisy, return items with:
+- normalized_name = null
+- confidence = low
 
-• DO NOT guess
-• If store name is unclear → return null
-• Store name should be a single string
-
-• For items:
-  - include raw_text
-  - include normalized_name (only if confident)
-  - include quantity and unit
-
-Return STRICT JSON:
+Return JSON:
 
 {{
-  "store_name": "",
-  "items":[
-    {{
-      "raw_text":"",
-      "normalized_name":"",
-      "quantity": null,
-      "unit":"",
-      "confidence":"",
-      "reason":""
-    }}
-  ]
+ "store_name": null_or_name_if_clearly_mentioned,
+ "items":[
+   {{
+     "raw_text":"",
+     "normalized_name":null_or_string,
+     "quantity":number_or_null,
+     "unit":null_or_string,
+     "confidence":"high/medium/low",
+     "reason":""
+   }}
+ ]
 }}
 
-Conversation:
+Transcript:
 {transcript_text}
 """
 
@@ -108,6 +109,7 @@ Conversation:
                 {"role": "user", "content": prompt}
             ],
             temperature=0,
+            top_p=0.1,
             response_format={"type": "json_object"},
         )
 
