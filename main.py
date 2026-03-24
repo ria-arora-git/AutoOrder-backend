@@ -39,53 +39,48 @@ async def process_audio(file: UploadFile = File(...)):
     try:
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
-    file=audio_file,
-    model="whisper-large-v3-turbo",
-    prompt="""
-Hindi grocery order conversation.
+                file=audio_file,
+                model="whisper-large-v3-turbo",
+                language="hi",
+                prompt="""
+Hindi grocery phone order.
 
-STRICT RULES:
-- Language is Hindi only
-- Do NOT output English sentences
-- Do NOT translate into English
-- Preserve Hindi words phonetically
+STRICT:
+- Hindi or Hinglish only
+- No random English words
+- No foreign language output
+- Preserve spoken words as-is
 
 Examples:
-bhaiya, kilo, dabba, tel, chini, chawal, rajma, dal
+bhaiya, kilo, dabba, tel, chini, chawal, rajma
 
-Bad output example:
-"metal tape bars" ❌
+Bad:
+metal tape bars
 
-Good output:
-"4 dabba tel" ✅
-""",
-    language="hi"
-)
+Good:
+4 dabba tel
+"""
+            )
 
-        transcript_text = transcription.text
+        transcript_text = transcription.text.strip()
 
-        prompt = f"""
-You are NOT allowed to guess.
+        print("TRANSCRIPT:", transcript_text)
 
-You ONLY extract items that are EXPLICITLY spoken.
+        extraction_prompt = f"""
+You extract grocery orders from Hindi phone calls.
 
 STRICT RULES:
 
-- Do NOT infer missing items
-- Do NOT replace unknown words with known grocery items
-- Do NOT translate into English if unclear
-- If word unclear → keep raw_text and mark LOW confidence
-- If something sounds like noise → keep as raw_text, do NOT interpret
+- Do NOT guess anything
+- Do NOT add items not present in transcript
+- Do NOT convert unclear words into known grocery items
+- If unclear → keep raw_text and mark LOW confidence
+- Do NOT force English translation
 
-IMPORTANT:
-If transcript is unclear or noisy, return items with:
-- normalized_name = null
-- confidence = low
-
-Return JSON:
+Return ONLY JSON:
 
 {{
- "store_name": null_or_name_if_clearly_mentioned,
+ "store_name": null_or_string,
  "items":[
    {{
      "raw_text":"",
@@ -106,14 +101,32 @@ Transcript:
             model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": "You extract structured grocery order data."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": extraction_prompt}
             ],
             temperature=0,
             top_p=0.1,
             response_format={"type": "json_object"},
         )
 
-        structured_data = json.loads(completion.choices[0].message.content)
+        response_text = completion.choices[0].message.content.strip()
+
+        try:
+            structured_data = json.loads(response_text)
+        except Exception:
+            return {
+                "error": "JSON parsing failed",
+                "raw_llm_output": response_text,
+                "transcript": transcript_text
+            }
+
+        cleaned_items = []
+
+        for item in structured_data.get("items", []):
+            if item.get("confidence") == "low":
+                item["normalized_name"] = None
+            cleaned_items.append(item)
+
+        structured_data["items"] = cleaned_items
 
         return {
             "model_used": "llama-3.1-8b-instant",
