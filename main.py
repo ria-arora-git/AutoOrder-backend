@@ -39,24 +39,21 @@ async def process_audio(file: UploadFile = File(...)):
     try:
         with open(temp_path, "rb") as audio_file:
             transcription = client.audio.transcriptions.create(
-                file=audio_file,
-                transcription = client.audio.transcriptions.create(
-    file=audio_file,
-    model="whisper-large-v3-turbo",
-    prompt="""
-            This is a Hindi grocery ordering phone call.
+            file=audio_file,
+            model="whisper-large-v3-turbo",
+            prompt="""
+        This is a Hindi grocery ordering phone call.
 
-            The speaker is speaking Hindi or punjabi.
+        The speaker speaks Hindi or Hinglish.
 
-            Common words:
-            bhaiya, kilo, dabba, tel, chini, chawal, rajma, dal, atta
+        Common words:
+        bhaiya, kilo, dabba, tel, chini, chawal, rajma, dal, atta
 
-            DO NOT interpret as English sentences.
-            Prefer Hindi phonetics over English words.
-            """,
-                language="hi"
-            )
-            )
+        Do NOT interpret as English.
+        Prefer Hindi phonetics.
+        """,
+            language="hi"
+        )
 
         transcript_text = transcription.text
 
