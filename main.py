@@ -80,7 +80,9 @@ STRICT RULES:
 - Do NOT guess anything
 - Do NOT add items not present in transcript
 - Do NOT convert unclear words into known grocery items
-- If unclear → keep raw_text and mark LOW confidence
+- If quantity and item are clearly present, mark HIGH confidence
+- If partially clear, mark MEDIUM
+- Only mark LOW if truly unclear or noise
 - Do NOT force English translation
 
 Return ONLY JSON:
